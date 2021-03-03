@@ -98,3 +98,40 @@ Clone this repository, add a remote pointing to your dokku server, and push:
 With that, plausible should be up and running having everything it needs to
 connect to the postgresql database, the clickhouse database, and the SMTP
 server.
+
+
+# IP Geolocation
+
+You'll need an account ID and license key from MaxMind.  Once you have those,
+create a maxmind app to periodically download the maxmind country database: 
+
+    $ dokku apps:create maxmind
+
+Configure it:
+
+    $ dokku config:set maxmind GEOIPUPDATE_ACCOUNT_ID=<account_id>
+    $ dokku config:set maxmind GEOIPUPDATE_LICENSE_KEY=<license_key>
+    $ dokku config:set maxmind GEOIPUPDATE_FREQUENCY=168
+    $ dokku config:set maxmind GEOIPUPDATE_EDITION_IDS=GeoLite2-Country
+
+As root, create a shared mount point to share the MaxMind country database:
+
+    # cd /var/lib/dokku/data/storage
+    # mkdir maxmind
+    # sudo chown -R 32767:32767 maxmind
+
+Mount it in the filesystem where the container downloads the database:
+
+    $ dokku storage:mount maxmind /var/lib/dokku/data/storage/maxmind:/usr/share/GeoIP
+
+Install the container:  (Requires dokku 0.24)
+
+    $ dokku git:from-image maxmind maxmindinc/geoipupdate
+
+Mount the same directory in the plausible container:
+
+    $ dokku storage:mount plausible /var/lib/dokku/data/storage/maxmind:/geoip
+
+Finally, configure plausible to use the country database:
+
+    $ dokku config:set plausible GEOLITE2_COUNTRY_DB=/geoip/GeoLite2-Country.mmdb
